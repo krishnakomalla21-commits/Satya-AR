@@ -71,6 +71,8 @@
   #card .kicker { color: #c8141e; font-size: 11px; letter-spacing: 3px; }
   #card h2 { margin: 4px 0 10px; font-size: 19px; letter-spacing: 1px; color: #f3e6cc; font-weight: 700; }
   #card p { margin: 0; font-family: Georgia, serif; font-size: 14px; line-height: 1.55; color: #cbbda6; }
+  #card .credit { margin-top: 8px; font-family: Georgia, serif; font-size: 11px; font-style: italic; color: #8a7a62; }
+  #card .credit:empty { display: none; }
   #card button { background: none; border: 0; color: #f3e6cc; font-family: "Cinzel", serif; font-size: 14px;
     letter-spacing: 3px; padding: 12px 0 2px; text-shadow: 0 0 8px rgba(255,210,150,.6); }
   #card button .arrow { color: #c8141e; margin-right: 8px; }
@@ -353,13 +355,39 @@ const SPOTS = [
   ['credits', 'music', 70, 1280], ['legacy', 'trophy', 75, 45]
 ];
 
+// Movie clips for each chapter (assets/videos/<name>.mp4). Chapters without one just show the card.
+const CLIPS = { synopsis: 'synopsis', rgv: 'rgv', satya: 'satya', vidya: 'vidya', bhiku: 'bhiku', credits: 'music' };
+
+const scenePlayer = {
+  playing: null,
+  play(id) {
+    const v = document.getElementById('scene-vid'), screen = document.getElementById('screen');
+    if (!CLIPS[id]) { this.stop(); return; }
+    if (this.playing !== id) { v.src = `assets/videos/${CLIPS[id]}.mp4`; v.load(); }
+    this.playing = id;
+    v.currentTime = 0;
+    v.play().catch(() => {});
+    screen.setAttribute('visible', 'true');
+    screen.setAttribute('animation__pop', 'property: scale; from: 0.2 0.2 0.2; to: 1 1 1; dur: 350; easing: easeOutBack');
+    sfx.fade(false);                                  // duck the background music
+  },
+  stop() {
+    const v = document.getElementById('scene-vid');
+    v.pause();
+    document.getElementById('screen').setAttribute('visible', 'false');
+    if (this.playing && window.__tracking) sfx.fade(true);
+    this.playing = null;
+  }
+};
+
 AFRAME.registerComponent('hotspot', {
   schema: { id: { type: 'string' } },
   init() {
     this.el.addEventListener('click', () => {
       if (!window.__tracking) return;
-      openCard(this.data.id);
       sfx.tick();
+      openCard(this.data.id);
+      scenePlayer.play(this.data.id);
     });
   }
 });
@@ -416,6 +444,7 @@ function openCard(id) {
   card.querySelector('.kicker').textContent = `CHAPTER ${String(n).padStart(2, '0')} · ${i.kicker.toUpperCase()}`;
   card.querySelector('h2').textContent = i.title;
   card.querySelector('p').textContent = i.body;
+  card.querySelector('.credit').textContent = CLIPS[id] ? 'Clip from Satya (1998), dir. Ram Gopal Varma' : '';
   card.scrollTop = 0;
   card.classList.add('open');
 }
@@ -441,7 +470,8 @@ function hint(text, ms) {
   </div>
 </div>
 <div id="hint"></div>
-<div id="card"><div class="kicker"></div><h2></h2><p></p><button id="close"><span class="arrow">◀</span>RESUME</button></div>
+<video id="scene-vid" playsinline webkit-playsinline preload="none" style="display:none"></video>
+<div id="card"><div class="kicker"></div><h2></h2><p></p><div class="credit"></div><button id="close"><span class="arrow">◀</span>RESUME</button></div>
 
 <a-scene
   mindar-image="imageTargetSrc: ./assets/targets.mind; autoStart: false; uiLoading: no; filterMinCF: 0.0001; filterBeta: 0.001"
@@ -455,6 +485,13 @@ function hint(text, ms) {
     <a-entity id="bleed" title-bleed></a-entity>
     <a-entity id="lights" skyline-lights></a-entity>
     <a-entity id="spots"></a-entity>
+    <!-- vintage TV screen that pops out in front of the poster -->
+    <a-entity id="screen" position="0 0.12 0.12" visible="false">
+      <a-plane width="0.98" height="0.56" color="#0b0505" material="shader: flat"></a-plane>
+      <a-plane width="0.952" height="0.532" position="0 0 0.001" color="#8a6d45" material="shader: flat"></a-plane>
+      <a-plane width="0.94" height="0.52" position="0 0 0.002" color="#000" material="shader: flat"></a-plane>
+      <a-plane width="0.92" height="0.485" position="0 0 0.003" material="shader: flat; src: #scene-vid"></a-plane>
+    </a-entity>
   </a-entity>
 </a-scene>
 
@@ -499,7 +536,9 @@ function showSpots() {
 
 target.addEventListener('targetFound', () => {
   window.__tracking = true;
-  sfx.fade(true);
+  const v = document.getElementById('scene-vid');
+  if (scenePlayer.playing && v.paused && !v.ended) v.play().catch(() => {});
+  if (!scenePlayer.playing) sfx.fade(true);
   hint('', 1);
   if (!played) {
     played = true;
@@ -513,6 +552,7 @@ target.addEventListener('targetFound', () => {
 });
 target.addEventListener('targetLost', () => {
   window.__tracking = false;
+  document.getElementById('scene-vid').pause();
   sfx.fade(false);
 });
 
@@ -530,7 +570,11 @@ document.getElementById('go').addEventListener('click', () => {
   const run = () => scene.systems['mindar-image-system'].start();
   scene.hasLoaded ? run() : scene.addEventListener('loaded', run);
 });
-document.getElementById('close').addEventListener('click', () => document.getElementById('card').classList.remove('open'));
+document.getElementById('close').addEventListener('click', () => {
+  document.getElementById('card').classList.remove('open');
+  scenePlayer.stop();
+});
+document.getElementById('scene-vid').addEventListener('ended', () => scenePlayer.stop());
 </script>
 </body>
 </html>
