@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>Satya — The Other Side of Truth (WebAR)</title>
+<script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #000; font-family: "Helvetica Neue", Arial, sans-serif; }
+  #start {
+    position: fixed; inset: 0; z-index: 20; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; text-align: center; color: #eee;
+    background: radial-gradient(circle at 50% 40%, #2a0606 0%, #000 70%); padding: 24px; box-sizing: border-box;
+  }
+  #start h1 { font-size: 64px; margin: 0; color: #c8141e; letter-spacing: 2px; font-style: italic; }
+  #start .hi { font-size: 28px; color: #c8141e; margin-top: 4px; }
+  #start p { color: #aaa; max-width: 300px; line-height: 1.5; font-size: 14px; }
+  #start button, #card button {
+    background: #c8141e; color: #fff; border: 0; border-radius: 999px;
+    padding: 14px 40px; font-size: 16px; font-weight: 600; letter-spacing: 1px; margin-top: 16px;
+  }
+  #hint {
+    position: fixed; left: 50%; top: 18px; transform: translateX(-50%); z-index: 10;
+    background: rgba(0,0,0,.65); color: #fff; font-size: 13px; padding: 8px 14px; border-radius: 999px;
+    opacity: 0; transition: opacity .4s; pointer-events: none; white-space: nowrap;
+  }
+  #hint.show { opacity: 1; }
+  #card {
+    position: fixed; left: 12px; right: 12px; bottom: 12px; z-index: 15;
+    background: rgba(12,6,6,.92); color: #eee; border-top: 3px solid #c8141e; border-radius: 14px;
+    padding: 18px 20px 20px; transform: translateY(130%); transition: transform .35s ease;
+    max-width: 520px; margin: 0 auto;
+  }
+  #card.open { transform: translateY(0); }
+  #card .kicker { color: #e0444b; font-size: 11px; letter-spacing: 2px; text-transform: uppercase; }
+  #card h2 { margin: 6px 0 8px; font-size: 20px; }
+  #card p { margin: 0; font-size: 14px; line-height: 1.55; color: #ccc; }
+  #card button { padding: 9px 26px; font-size: 13px; margin-top: 14px; }
+</style>
+
+<script>
+/* ---------- Poster coordinate helper ----------
+   Target image is 980 x 1358 px. MindAR scales the target to width = 1,
+   so x runs -0.5..0.5 and y runs -0.693..0.693 (centre = 0,0). */
+const IMG_W = 980, IMG_H = 1358;
+function px(x, y) { return { x: x / IMG_W - 0.5, y: (IMG_H / 2 - y) / IMG_W }; }
+
+/* Seeded random so the cracks look the same every time */
+function rng(seed) { return () => (seed = (seed * 16807) % 2147483647) / 2147483647; }
+
+/* ---------- Effect 1: glass cracks burst from the title ---------- */
+AFRAME.registerComponent('crack-burst', {
+  init() {
+    const r = rng(7), group = new THREE.Group(), c = px(330, 500);
+    const mat = new THREE.MeshBasicMaterial({ color: 0xf4f0ff, transparent: true, opacity: 0.9, depthTest: false });
+    this.segs = [];
+    const rays = 12;
+    for (let i = 0; i < rays; i++) {
+      let ang = (i / rays) * Math.PI * 2 + (r() - 0.5) * 0.5;
+      let x = c.x, y = c.y;
+      const total = 0.12 + r() * 0.25, steps = 4;
+      for (let k = 0; k < steps; k++) {
+        const len = (total / steps) * (0.7 + r() * 0.6);
+        ang += (r() - 0.5) * 0.7;
+        const thick = 0.0045 - k * 0.0009;
+        const geo = new THREE.PlaneGeometry(len, thick); geo.translate(len / 2, 0, 0);
+        const m = new THREE.Mesh(geo, mat); m.position.set(x, y, 0.004); m.rotation.z = ang; m.scale.x = 0.0001;
+        m.renderOrder = 5; group.add(m);
+        this.segs.push({ m, delay: i * 0.03 + k * 0.11 });
+        x += Math.cos(ang) * len; y += Math.sin(ang) * len;
+      }
+    }
+    // impact flash
+    this.flash = new THREE.Mesh(new THREE.CircleGeometry(0.06, 32),
+      new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthTest: false }));
+    this.flash.position.set(c.x, c.y, 0.005); this.flash.renderOrder = 6; group.add(this.flash);
+    this.el.setObject3D('mesh', group);
+    this.t = -1;
+  },
+  start() { this.t = 0; },
+  tick(t, dt) {
+    if (this.t < 0 || this.t > 3) return;
+    this.t += dt / 1000;
+    for (const s of this.segs) s.m.scale.x = Math.max(0.0001, Math.min(1, (this.t - s.delay) / 0.12));
+    this.flash.material.opacity = Math.max(0, 0.9 - this.t * 3);
+  }
+});
+
+/* ---------- Effect 2: the red title bleeds ---------- */
+AFRAME.registerComponent('title-bleed', {
+  init() {
+    const r = rng(42), group = new THREE.Group();
+    const mat = new THREE.MeshBasicMaterial({ color: 0xa50f17, transparent: true, opacity: 0.95, depthTest: false });
+    // drip start points along the bottom of the painted "Satya" strokes (image px)
+    const starts = [[40,455],[95,440],[150,445],[205,418],[262,415],[318,585],[372,425],[430,415],[490,405],[528,400]];
+    this.drips = starts.map(([sx, sy], i) => {
+      const p = px(sx, sy), w = 0.006 + r() * 0.007;
+      const geo = new THREE.PlaneGeometry(w, 1); geo.translate(0, -0.5, 0);
+      const stem = new THREE.Mesh(geo, mat); stem.position.set(p.x, p.y, 0.003); stem.scale.y = 0.0001;
+      const bulb = new THREE.Mesh(new THREE.CircleGeometry(w * 0.9, 16), mat); bulb.position.set(p.x, p.y, 0.003);
+      stem.renderOrder = bulb.renderOrder = 4;
+      group.add(stem, bulb);
+      return { stem, bulb, y0: p.y, max: 0.04 + r() * 0.12, delay: 0.6 + i * 0.12 + r() * 0.4, dur: 2 + r() * 1.5 };
+    });
+    this.el.setObject3D('mesh', group);
+    this.t = -1;
+  },
+  start() { this.t = 0; },
+  tick(t, dt) {
+    if (this.t < 0 || this.t > 8) return;
+    this.t += dt / 1000;
+    for (const d of this.drips) {
+      const p = Math.max(0, Math.min(1, (this.t - d.delay) / d.dur));
+      const len = d.max * (1 - Math.pow(1 - p, 3)) + 0.0001;
+      d.stem.scale.y = len; d.bulb.position.y = d.y0 - len;
+    }
+  }
+});
+
+/* ---------- Effect 3: skyline windows flicker ---------- */
+AFRAME.registerComponent('skyline-lights', {
+  init() {
+    const r = rng(99), group = new THREE.Group();
+    this.lights = [];
+    for (let i = 0; i < 40; i++) {
+      const p = px(10 + r() * 640, 570 + r() * 45);
+      const mat = new THREE.MeshBasicMaterial({ color: 0xffd27a, transparent: true, opacity: 0, depthTest: false });
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(0.006, 0.008), mat);
+      m.position.set(p.x, p.y, 0.002); m.renderOrder = 3; group.add(m);
+      this.lights.push({ m, period: 1.5 + r() * 4, phase: r() * 10 });
+    }
+    this.el.setObject3D('mesh', group);
+    this.on = false; this.time = 0;
+  },
+  start() { this.on = true; },
+  tick(t, dt) {
+    if (!this.on) return;
+    this.time += dt / 1000;
+    for (const l of this.lights) {
+      const v = Math.sin((this.time + l.phase) * (Math.PI * 2 / l.period));
+      l.m.material.opacity = v > 0.2 ? (Math.random() < 0.03 ? 0.2 : 0.95) : 0;
+    }
+  }
+});
+
+/* ---------- Tappable info points ---------- */
+const INFO = {
+  title: { kicker: 'The film', title: 'Satya (1998)',
+    body: 'Satya ("Truth") is a 1998 Hindi crime film produced and directed by Ram Gopal Varma, written by Saurabh Shukla and Anurag Kashyap. It released on 3 July 1998.' },
+  tagline: { kicker: 'The city', title: 'The Other Side of Truth',
+    body: 'The tagline sits on shattered glass above the Mumbai skyline. The city is the film\'s real backdrop: Satya was shot in Mumbai on a budget of about ₹2.5 crore.' },
+  satya: { kicker: 'Character', title: 'Satya — J. D. Chakravarthy',
+    body: 'An outsider with no past who arrives in Bombay looking for work and is pulled into the underworld, rising inside a gang while hiding that life from the woman he loves.' },
+  vidya: { kicker: 'Character', title: 'Vidya — Urmila Matondkar',
+    body: 'Satya\'s neighbour and an aspiring singer. Their quiet romance and its songs play against the violence of the gang world. Matondkar was nominated for the Filmfare Best Actress award.' },
+  chase: { kicker: 'Behind the camera', title: 'Guerrilla filmmaking',
+    body: 'Shot by Gerard Hooper and Mazhar Kamran (printed "Hamran" on this poster). Kamran used available light and a small crew so they could film on real Mumbai streets without being mobbed.' },
+  credits: { kicker: 'Sound', title: 'Music',
+    body: 'Songs composed by Vishal Bhardwaj with lyrics by Gulzar. The background score is by Sandeep Chowta.' },
+  legacy: { kicker: 'Legacy', title: 'Redefining Indian noir',
+    body: 'Satya won six Filmfare Awards and a National Film Award (Manoj Bajpayee, Best Supporting Actor), launched the careers of Bajpayee and Anurag Kashyap, and began Varma\'s Gangster trilogy with Company and D.' }
+};
+const SPOTS = [
+  ['legacy', 75, 45], ['title', 290, 330], ['tagline', 45, 525], ['satya', 880, 250],
+  ['chase', 180, 720], ['vidya', 560, 790], ['credits', 70, 1280]
+];
+
+AFRAME.registerComponent('hotspot', {
+  schema: { id: { type: 'string' } },
+  init() {
+    this.el.addEventListener('click', () => {
+      if (!window.__tracking) return;
+      openCard(this.data.id);
+      sfx.tick();
+    });
+  }
+});
+
+/* ---------- Audio: noir drone + glass crack (synthesised, no files needed) ---------- */
+const sfx = {
+  ctx: null, master: null, theme: null,
+  init() {
+    // Optional: drop your own track at assets/theme.mp3 and it replaces the drone.
+    this.theme = new Audio('assets/theme.mp3'); this.theme.loop = true; this.theme.volume = 0;
+    this.theme.addEventListener('error', () => { this.theme = null; });
+    const ctx = this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    this.master = ctx.createGain(); this.master.gain.value = 0; this.master.connect(ctx.destination);
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 280; lp.connect(this.master);
+    [55, 55.4, 82.4].forEach(f => {
+      const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f;
+      const g = ctx.createGain(); g.gain.value = 0.06; o.connect(g); g.connect(lp); o.start();
+    });
+    const lfo = ctx.createOscillator(); lfo.frequency.value = 0.08;
+    const lg = ctx.createGain(); lg.gain.value = 120; lfo.connect(lg); lg.connect(lp.frequency); lfo.start();
+  },
+  fade(on) {
+    if (this.theme) {
+      if (on) this.theme.play().catch(() => {});
+      const target = on ? 0.8 : 0, a = this.theme;
+      clearInterval(this._fi);
+      this._fi = setInterval(() => {
+        a.volume = Math.max(0, Math.min(1, a.volume + (target > a.volume ? 0.05 : -0.05)));
+        if (Math.abs(a.volume - target) < 0.06) { a.volume = target; clearInterval(this._fi); if (!on) a.pause(); }
+      }, 60);
+      return;
+    }
+    if (!this.ctx) return;
+    const g = this.master.gain, t = this.ctx.currentTime;
+    g.cancelScheduledValues(t); g.setValueAtTime(g.value, t); g.linearRampToValueAtTime(on ? 0.9 : 0, t + (on ? 2 : 0.6));
+  },
+  noise(dur, hp, vol) {
+    if (!this.ctx) return;
+    const ctx = this.ctx, buf = ctx.createBuffer(1, ctx.sampleRate * dur, ctx.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 4);
+    const s = ctx.createBufferSource(); s.buffer = buf;
+    const f = ctx.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = hp;
+    const g = ctx.createGain(); g.gain.value = vol;
+    s.connect(f); f.connect(g); g.connect(ctx.destination); s.start();
+  },
+  crack() { this.noise(0.5, 1800, 0.8); setTimeout(() => this.noise(0.25, 3000, 0.4), 120); },
+  tick() { this.noise(0.05, 4000, 0.3); }
+};
+
+/* ---------- UI helpers ---------- */
+function openCard(id) {
+  const i = INFO[id], card = document.getElementById('card');
+  card.querySelector('.kicker').textContent = i.kicker;
+  card.querySelector('h2').textContent = i.title;
+  card.querySelector('p').textContent = i.body;
+  card.classList.add('open');
+}
+function hint(text, ms) {
+  const h = document.getElementById('hint'); h.textContent = text; h.classList.add('show');
+  clearTimeout(h._t); if (ms) h._t = setTimeout(() => h.classList.remove('show'), ms);
+}
+</script>
+</head>
+
+<body>
+<div id="start">
+  <h1>Satya</h1>
+  <div class="hi">सत्या</div>
+  <p>Point your camera at the <b>Satya</b> poster in the Film Noir section. Turn your sound on.</p>
+  <button id="go">START</button>
+</div>
+<div id="hint"></div>
+<div id="card"><div class="kicker"></div><h2></h2><p></p><button id="close">CLOSE</button></div>
+
+<a-scene
+  mindar-image="imageTargetSrc: ./assets/targets.mind; autoStart: false; uiLoading: no; filterMinCF: 0.0001; filterBeta: 0.001"
+  color-space="sRGB" renderer="colorManagement: true" vr-mode-ui="enabled: false"
+  device-orientation-permission-ui="enabled: false">
+  <a-camera position="0 0 0" look-controls="enabled: false"
+    cursor="fuse: false; rayOrigin: mouse" raycaster="far: 10000; objects: .clickable"></a-camera>
+
+  <a-entity id="target" mindar-image-target="targetIndex: 0">
+    <a-entity id="cracks" crack-burst></a-entity>
+    <a-entity id="bleed" title-bleed></a-entity>
+    <a-entity id="lights" skyline-lights></a-entity>
+    <a-entity id="spots"></a-entity>
+  </a-entity>
+</a-scene>
+
+<script>
+const scene = document.querySelector('a-scene');
+const target = document.getElementById('target');
+const spots = document.getElementById('spots');
+let played = false;
+
+// Build the hotspots
+SPOTS.forEach(([id, x, y]) => {
+  const p = px(x, y);
+  const e = document.createElement('a-entity');
+  e.setAttribute('position', `${p.x} ${p.y} 0.01`);
+  e.setAttribute('visible', 'false');
+  e.innerHTML = `
+    <a-ring radius-inner="0.022" radius-outer="0.03" color="#ffffff" material="shader: flat; transparent: true; opacity: 0.9"
+      animation="property: scale; from: 1 1 1; to: 1.5 1.5 1.5; dir: alternate; loop: true; dur: 800; easing: easeInOutSine"></a-ring>
+    <a-circle radius="0.016" color="#e0242c" material="shader: flat"></a-circle>
+    <a-circle class="clickable" hotspot="id: ${id}" radius="0.055" material="shader: flat; transparent: true; opacity: 0"></a-circle>`;
+  spots.appendChild(e);
+});
+
+function showSpots() {
+  [...spots.children].forEach((e, i) => setTimeout(() => {
+    e.setAttribute('visible', 'true');
+    e.setAttribute('animation__in', 'property: scale; from: 0.01 0.01 0.01; to: 1 1 1; dur: 400; easing: easeOutBack');
+  }, i * 150));
+}
+
+target.addEventListener('targetFound', () => {
+  window.__tracking = true;
+  sfx.fade(true);
+  hint('', 1);
+  if (!played) {
+    played = true;
+    sfx.crack();
+    document.getElementById('cracks').components['crack-burst'].start();
+    document.getElementById('bleed').components['title-bleed'].start();
+    document.getElementById('lights').components['skyline-lights'].start();
+    setTimeout(showSpots, 2200);
+    setTimeout(() => hint('Tap the red points to explore', 4000), 3200);
+  }
+});
+target.addEventListener('targetLost', () => {
+  window.__tracking = false;
+  sfx.fade(false);
+});
+
+document.getElementById('go').addEventListener('click', () => {
+  sfx.init();
+  if (sfx.ctx.state === 'suspended') sfx.ctx.resume();
+  if (sfx.theme) sfx.theme.play().then(() => sfx.theme.pause()).catch(() => {}); // unlock on iOS
+  document.getElementById('start').style.display = 'none';
+  const run = () => { scene.systems['mindar-image-system'].start(); };
+  scene.hasLoaded ? run() : scene.addEventListener('loaded', run);
+});
+document.getElementById('close').addEventListener('click', () => document.getElementById('card').classList.remove('open'));
+</script>
+</body>
+</html>
