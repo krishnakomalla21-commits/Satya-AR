@@ -48,6 +48,10 @@
   #go:active { color: #fff; transform: scale(.97); }
   @keyframes glow { 50% { text-shadow: 0 0 18px rgba(255,210,150,1); } }
   @keyframes blink { 50% { opacity: 0; } }
+  #watch { display: inline-block; margin-top: 6px; color: #b8a888; font-size: 14px; letter-spacing: 3px;
+    text-decoration: none; padding: 8px 18px; }
+  #watch .arrow { color: #7a0a10; margin-right: 10px; }
+  #watch:active { color: #fff; }
   #start .foot { margin-top: 14px; font-size: 10px; letter-spacing: 2px; color: #7d6d58; font-family: Georgia, serif; }
 
   /* ---------- subtitle-style hint ---------- */
@@ -73,6 +77,8 @@
   #card p { margin: 0; font-family: Georgia, serif; font-size: 14px; line-height: 1.55; color: #cbbda6; }
   #card .credit { margin-top: 8px; font-family: Georgia, serif; font-size: 11px; font-style: italic; color: #8a7a62; }
   #card .credit:empty { display: none; }
+  #card .watch-link { display: none; margin-top: 12px; color: #e0444b; font-size: 12px; letter-spacing: 2px; text-decoration: none; }
+  #card .watch-link.show { display: block; }
   #card button { background: none; border: 0; color: #f3e6cc; font-family: "Cinzel", serif; font-size: 14px;
     letter-spacing: 3px; padding: 12px 0 2px; text-shadow: 0 0 8px rgba(255,210,150,.6); }
   #card button .arrow { color: #c8141e; margin-right: 8px; }
@@ -471,6 +477,7 @@ function openCard(id) {
   card.querySelector('.kicker').textContent = `CHAPTER ${String(n).padStart(2, '0')} · ${i.kicker.toUpperCase()}`;
   card.querySelector('h2').textContent = i.title;
   card.querySelector('p').textContent = i.body;
+  card.querySelector('.watch-link').classList.toggle('show', id === 'synopsis');
   card.querySelector('.credit').textContent = CLIPS[id] ? 'Clip from Satya (1998), dir. Ram Gopal Varma' : '';
   card.scrollTop = 0;
   card.classList.add('open');
@@ -492,14 +499,15 @@ function hint(text, ms) {
     <h1>Satya</h1>
   </div>
   <div class="bottom">
-    <button id="go"><span class="arrow">▶</span>PLAY MOVIE</button>
+    <button id="go"><span class="arrow">▶</span>PLAY MOVIE</button><br>
+    <a id="watch" href="https://youtu.be/wcDTkqe0ASA" target="_blank" rel="noopener"><span class="arrow">▶</span>TO ENTER THE WORLD OF SATYA</a>
     <div class="foot">POINT YOUR CAMERA AT THE POSTER · SOUND ON</div>
   </div>
 </div>
 <div id="hint"></div>
 <video id="scene-vid" playsinline webkit-playsinline preload="auto"
   style="position:fixed;left:0;top:0;width:2px;height:2px;opacity:0.01;pointer-events:none;z-index:-1"></video>
-<div id="card"><div class="kicker"></div><h2></h2><p></p><div class="credit"></div><button id="close"><span class="arrow">◀</span>RESUME</button></div>
+<div id="card"><div class="kicker"></div><h2></h2><p></p><div class="credit"></div><a class="watch-link" href="https://youtu.be/wcDTkqe0ASA" target="_blank" rel="noopener">▶ TO ENTER THE WORLD OF SATYA</a><button id="close"><span class="arrow">◀</span>RESUME</button></div>
 
 <a-scene
   mindar-image="imageTargetSrc: ./assets/targets.mind; autoStart: false; uiLoading: no; filterMinCF: 0.0001; filterBeta: 0.001"
@@ -598,6 +606,7 @@ document.getElementById('close').addEventListener('click', () => {
   scenePlayer.stop();
 });
 document.getElementById('scene-vid').addEventListener('ended', () => scenePlayer.stop());
+document.querySelector('#card .watch-link').addEventListener('click', () => document.getElementById('scene-vid').pause());
 </script>
 </body>
 </html>
