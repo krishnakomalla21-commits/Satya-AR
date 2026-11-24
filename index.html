@@ -318,7 +318,7 @@ AFRAME.registerComponent('badge-icon', {
     };
     base();
     const t = tex(c);
-    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(0.08, 0.08), flatMat(t));
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(0.11, 0.11), flatMat(t));
     mesh.renderOrder = 8; this.el.setObject3D('mesh', mesh);
     const img = new Image();
     img.onload = () => { base(); x.drawImage(img, 48, 48, 160, 160); t.needsUpdate = true; };
@@ -483,10 +483,10 @@ SPOTS.forEach(([id, icon, x, y]) => {
   e.setAttribute('position', `${p.x} ${p.y} 0.01`);
   e.setAttribute('visible', 'false');
   e.innerHTML = `
-    <a-ring radius-inner="0.042" radius-outer="0.047" color="#c8141e" material="shader: flat; transparent: true; opacity: 0.85"
+    <a-ring radius-inner="0.058" radius-outer="0.064" color="#c8141e" material="shader: flat; transparent: true; opacity: 0.85"
       animation="property: scale; from: 1 1 1; to: 1.3 1.3 1.3; dir: alternate; loop: true; dur: 900; easing: easeInOutSine"></a-ring>
     <a-entity badge-icon="icon: ${icon}"></a-entity>
-    <a-circle class="clickable" hotspot="id: ${id}" radius="0.055" material="shader: flat; transparent: true; opacity: 0"></a-circle>`;
+    <a-circle class="clickable" hotspot="id: ${id}" radius="0.075" material="shader: flat; transparent: true; opacity: 0"></a-circle>`;
   spots.appendChild(e);
 });
 
