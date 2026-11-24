@@ -6,37 +6,69 @@
 <title>Satya — The Other Side of Truth (WebAR)</title>
 <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Playfair+Display:ital,wght@1,700&display=swap" rel="stylesheet">
 <style>
-  html, body { margin: 0; height: 100%; overflow: hidden; background: #000; font-family: "Helvetica Neue", Arial, sans-serif; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #000; font-family: "Cinzel", Georgia, serif; }
+
+  /* ---------- DVD menu start screen ---------- */
   #start {
     position: fixed; inset: 0; z-index: 20; display: flex; flex-direction: column;
-    align-items: center; justify-content: center; text-align: center; color: #eee;
-    background: radial-gradient(circle at 50% 40%, #2a0606 0%, #000 70%); padding: 24px; box-sizing: border-box;
+    align-items: center; justify-content: center; text-align: center; color: #e8dcc8;
+    background: radial-gradient(ellipse at 50% 45%, #3a0a0a 0%, #160303 55%, #000 100%);
+    transition: opacity .6s;
   }
-  #start h1 { font-size: 64px; margin: 0; color: #c8141e; letter-spacing: 2px; font-style: italic; }
-  #start .hi { font-size: 28px; color: #c8141e; margin-top: 4px; }
-  #start p { color: #aaa; max-width: 300px; line-height: 1.5; font-size: 14px; }
-  #start button, #card button {
-    background: #c8141e; color: #fff; border: 0; border-radius: 999px;
-    padding: 14px 40px; font-size: 16px; font-weight: 600; letter-spacing: 1px; margin-top: 16px;
+  #start.out { opacity: 0; pointer-events: none; }
+  #start::before, #start::after {           /* letterbox bars */
+    content: ""; position: absolute; left: 0; right: 0; height: 11vh; background: #000; z-index: 2;
   }
+  #start::before { top: 0; } #start::after { bottom: 0; }
+  #grain { position: absolute; inset: 0; width: 100%; height: 100%; opacity: .12; mix-blend-mode: screen; pointer-events: none; z-index: 1; }
+  #start .vig { position: absolute; inset: 0; z-index: 1; pointer-events: none;
+    box-shadow: inset 0 0 140px 40px #000; animation: flicker 4s infinite steps(1); }
+  @keyframes flicker { 0%,100% {opacity:1} 47% {opacity:.85} 48% {opacity:1} 73% {opacity:.92} 74% {opacity:1} }
+  #start .content { position: relative; z-index: 3; animation: fadein 2.2s ease; }
+  @keyframes fadein { from { opacity: 0; transform: scale(1.04); } to { opacity: 1; transform: none; } }
+  #start .pre { font-size: 11px; letter-spacing: 4px; color: #a8957a; }
+  #start h1 { font-family: "Playfair Display", serif; font-style: italic; font-size: 76px; margin: 6px 0 0;
+    color: #c8141e; text-shadow: 0 0 24px rgba(200,20,30,.45), 2px 2px 0 #000; }
+  #start .tag { font-size: 12px; letter-spacing: 5px; color: #cdbb9c; margin-top: 2px; }
+  #start .hi { font-family: serif; font-size: 22px; color: #9e1219; margin-top: 10px; opacity: .85; }
+  #go {
+    margin-top: 46px; background: none; border: 0; color: #f3e6cc; font-family: "Cinzel", serif;
+    font-size: 20px; letter-spacing: 4px; padding: 8px 18px; cursor: pointer;
+    text-shadow: 0 0 10px rgba(255,210,150,.7); animation: glow 1.6s ease-in-out infinite;
+  }
+  #go .arrow { color: #c8141e; margin-right: 10px; animation: blink 1s steps(1) infinite; }
+  #go:active { color: #fff; transform: scale(.97); }
+  @keyframes glow { 50% { text-shadow: 0 0 18px rgba(255,210,150,1); } }
+  @keyframes blink { 50% { opacity: 0; } }
+  #start .foot { position: absolute; bottom: calc(11vh + 14px); left: 0; right: 0; z-index: 3;
+    font-size: 10px; letter-spacing: 2px; color: #7d6d58; font-family: Georgia, serif; }
+
+  /* ---------- subtitle-style hint ---------- */
   #hint {
-    position: fixed; left: 50%; top: 18px; transform: translateX(-50%); z-index: 10;
-    background: rgba(0,0,0,.65); color: #fff; font-size: 13px; padding: 8px 14px; border-radius: 999px;
-    opacity: 0; transition: opacity .4s; pointer-events: none; white-space: nowrap;
+    position: fixed; left: 0; right: 0; top: 22px; z-index: 10; text-align: center;
+    font-family: Georgia, serif; font-size: 16px; color: #fff59a;
+    text-shadow: 0 0 3px #000, 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
+    opacity: 0; transition: opacity .4s; pointer-events: none;
   }
   #hint.show { opacity: 1; }
+
+  /* ---------- DVD chapter card ---------- */
   #card {
-    position: fixed; left: 12px; right: 12px; bottom: 12px; z-index: 15;
-    background: rgba(12,6,6,.92); color: #eee; border-top: 3px solid #c8141e; border-radius: 14px;
-    padding: 18px 20px 20px; transform: translateY(130%); transition: transform .35s ease;
-    max-width: 520px; margin: 0 auto;
+    position: fixed; left: 12px; right: 12px; bottom: 14px; z-index: 15; max-width: 520px; margin: 0 auto;
+    background: linear-gradient(180deg, rgba(30,6,6,.94), rgba(8,2,2,.96)); color: #e8dcc8;
+    border: 1px solid #8a6d45; outline: 1px solid rgba(138,109,69,.35); outline-offset: 3px;
+    padding: 18px 20px 14px; transform: translateY(140%); transition: transform .35s ease;
   }
   #card.open { transform: translateY(0); }
-  #card .kicker { color: #e0444b; font-size: 11px; letter-spacing: 2px; text-transform: uppercase; }
-  #card h2 { margin: 6px 0 8px; font-size: 20px; }
-  #card p { margin: 0; font-size: 14px; line-height: 1.55; color: #ccc; }
-  #card button { padding: 9px 26px; font-size: 13px; margin-top: 14px; }
+  #card .kicker { color: #c8141e; font-size: 11px; letter-spacing: 3px; }
+  #card h2 { margin: 4px 0 10px; font-size: 19px; letter-spacing: 1px; color: #f3e6cc; font-weight: 700; }
+  #card p { margin: 0; font-family: Georgia, serif; font-size: 14px; line-height: 1.55; color: #cbbda6; }
+  #card button { background: none; border: 0; color: #f3e6cc; font-family: "Cinzel", serif; font-size: 14px;
+    letter-spacing: 3px; padding: 12px 0 2px; text-shadow: 0 0 8px rgba(255,210,150,.6); }
+  #card button .arrow { color: #c8141e; margin-right: 8px; }
 </style>
 
 <script>
@@ -225,7 +257,8 @@ const sfx = {
 /* ---------- UI helpers ---------- */
 function openCard(id) {
   const i = INFO[id], card = document.getElementById('card');
-  card.querySelector('.kicker').textContent = i.kicker;
+  const n = SPOTS.findIndex(sp => sp[0] === id) + 1;
+  card.querySelector('.kicker').textContent = `CHAPTER ${String(n).padStart(2, '0')} · ${i.kicker.toUpperCase()}`;
   card.querySelector('h2').textContent = i.title;
   card.querySelector('p').textContent = i.body;
   card.classList.add('open');
@@ -239,13 +272,19 @@ function hint(text, ms) {
 
 <body>
 <div id="start">
-  <h1>Satya</h1>
-  <div class="hi">सत्या</div>
-  <p>Point your camera at the <b>Satya</b> poster in the Film Noir section. Turn your sound on.</p>
-  <button id="go">START</button>
+  <canvas id="grain"></canvas>
+  <div class="vig"></div>
+  <div class="content">
+    <div class="pre">RAM GOPAL VARMA'S</div>
+    <h1>Satya</h1>
+    <div class="tag">THE OTHER SIDE OF TRUTH</div>
+    <div class="hi">सत्या</div>
+    <button id="go"><span class="arrow">▶</span>PLAY MOVIE</button>
+  </div>
+  <div class="foot">POINT YOUR CAMERA AT THE POSTER · SOUND ON</div>
 </div>
 <div id="hint"></div>
-<div id="card"><div class="kicker"></div><h2></h2><p></p><button id="close">CLOSE</button></div>
+<div id="card"><div class="kicker"></div><h2></h2><p></p><button id="close"><span class="arrow">◀</span>RESUME</button></div>
 
 <a-scene
   mindar-image="imageTargetSrc: ./assets/targets.mind; autoStart: false; uiLoading: no; filterMinCF: 0.0001; filterBeta: 0.001"
@@ -264,6 +303,18 @@ function hint(text, ms) {
 
 <script>
 const scene = document.querySelector('a-scene');
+
+// Film grain on the menu
+(() => {
+  const c = document.getElementById('grain'), x = c.getContext('2d');
+  c.width = 160; c.height = 284;
+  const img = x.createImageData(c.width, c.height);
+  (function loop() {
+    if (document.getElementById('start').classList.contains('out')) return;
+    for (let i = 0; i < img.data.length; i += 4) { const v = Math.random() * 255; img.data[i] = img.data[i+1] = img.data[i+2] = v; img.data[i+3] = 255; }
+    x.putImageData(img, 0, 0); setTimeout(() => requestAnimationFrame(loop), 50);
+  })();
+})();
 const target = document.getElementById('target');
 const spots = document.getElementById('spots');
 let played = false;
@@ -312,7 +363,13 @@ document.getElementById('go').addEventListener('click', () => {
   sfx.init();
   if (sfx.ctx.state === 'suspended') sfx.ctx.resume();
   if (sfx.theme) sfx.theme.play().then(() => sfx.theme.pause()).catch(() => {}); // unlock on iOS
-  document.getElementById('start').style.display = 'none';
+  // DVD remote "select" blip
+  const o = sfx.ctx.createOscillator(), g = sfx.ctx.createGain(), t = sfx.ctx.currentTime;
+  o.type = 'square'; o.frequency.setValueAtTime(880, t); o.frequency.setValueAtTime(1320, t + 0.06);
+  g.gain.setValueAtTime(0.08, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+  o.connect(g); g.connect(sfx.ctx.destination); o.start(t); o.stop(t + 0.2);
+  const st = document.getElementById('start'); st.classList.add('out');
+  setTimeout(() => st.style.display = 'none', 650);
   const run = () => { scene.systems['mindar-image-system'].start(); };
   scene.hasLoaded ? run() : scene.addEventListener('loaded', run);
 });
