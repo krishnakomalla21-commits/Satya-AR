@@ -1,6 +1,6 @@
 # Satya — WebAR Poster (MC3101 Module 05)
 
-Point a phone at the *Satya (1998)* poster in the Film Noir section. When the poster is detected, glass cracks spread from the title, the red title bleeds, the skyline windows flicker, a noir drone fades in, and 7 tappable points open info cards.
+Point a phone at the *Satya (1998)* poster in the Film Noir section. When the poster is detected, glass cracks spread from the title, the red title bleeds, the skyline windows flicker, a noir drone fades in, and 8 tappable icons open chapter cards.
 
 **Stack:** MindAR 1.2.5 (image tracking) + A-Frame 1.5.0
 
@@ -8,6 +8,7 @@ Point a phone at the *Satya (1998)* poster in the Film Noir section. When the po
 - `index.html`: the whole experience
 - `assets/targets.mind`: compiled tracking data for the poster
 - `assets/satya-target.jpg`: the image the tracking file was made from
+- `assets/quote.jpg`: the menu background
 - `assets/theme.mp3` (optional): add your own track and it replaces the synth drone
 
 ## Deploy (GitHub Pages)

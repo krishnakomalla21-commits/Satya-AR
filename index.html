@@ -17,27 +17,30 @@
   #start {
     position: fixed; inset: 0; z-index: 20; display: flex; flex-direction: column;
     align-items: center; justify-content: center; text-align: center; color: #e8dcc8;
-    background: radial-gradient(ellipse at 50% 45%, #3a0a0a 0%, #160303 55%, #000 100%);
+    background: radial-gradient(ellipse at 50% 50%, #2a0606 0%, #0e0202 60%, #000 100%);
     transition: opacity .6s;
   }
   #start.out { opacity: 0; pointer-events: none; }
-  #start::before, #start::after {           /* letterbox bars */
-    content: ""; position: absolute; left: 0; right: 0; height: 11vh; background: #000; z-index: 2;
-  }
+  #start::before, #start::after { content: ""; position: absolute; left: 0; right: 0; height: 11vh; background: #000; z-index: 4; }
   #start::before { top: 0; } #start::after { bottom: 0; }
-  #grain { position: absolute; inset: 0; width: 100%; height: 100%; opacity: .12; mix-blend-mode: screen; pointer-events: none; z-index: 1; }
-  #start .vig { position: absolute; inset: 0; z-index: 1; pointer-events: none;
+  #grain { position: absolute; inset: 0; width: 100%; height: 100%; opacity: .12; mix-blend-mode: screen; pointer-events: none; z-index: 2; }
+  #start .vig { position: absolute; inset: 0; z-index: 2; pointer-events: none;
     box-shadow: inset 0 0 140px 40px #000; animation: flicker 4s infinite steps(1); }
   @keyframes flicker { 0%,100% {opacity:1} 47% {opacity:.85} 48% {opacity:1} 73% {opacity:.92} 74% {opacity:1} }
-  #start .content { position: relative; z-index: 3; animation: fadein 2.2s ease; }
-  @keyframes fadein { from { opacity: 0; transform: scale(1.04); } to { opacity: 1; transform: none; } }
+  #start .quote {
+    position: absolute; left: 4%; top: 50%; width: 92%; transform: translateY(-50%); z-index: 1;
+    mix-blend-mode: screen; opacity: .9; animation: projector 9s ease-in-out infinite alternate;
+  }
+  @keyframes projector { from { transform: translateY(-50%) scale(1); } to { transform: translateY(-50%) scale(1.03); } }
+  #start .top, #start .bottom { position: absolute; left: 0; right: 0; z-index: 3; animation: fadein 2.2s ease both; }
+  #start .top { top: calc(11vh + 6vh); }
+  #start .bottom { bottom: calc(11vh + 6vh); animation-delay: .8s; }
+  @keyframes fadein { from { opacity: 0; } to { opacity: 1; } }
   #start .pre { font-size: 11px; letter-spacing: 4px; color: #a8957a; }
-  #start h1 { font-family: "Playfair Display", serif; font-style: italic; font-size: 76px; margin: 6px 0 0;
+  #start h1 { font-family: "Playfair Display", serif; font-style: italic; font-size: 64px; margin: 4px 0 0;
     color: #c8141e; text-shadow: 0 0 24px rgba(200,20,30,.45), 2px 2px 0 #000; }
-  #start .tag { font-size: 12px; letter-spacing: 5px; color: #cdbb9c; margin-top: 2px; }
-  #start .hi { font-family: serif; font-size: 22px; color: #9e1219; margin-top: 10px; opacity: .85; }
   #go {
-    margin-top: 46px; background: none; border: 0; color: #f3e6cc; font-family: "Cinzel", serif;
+    background: none; border: 0; color: #f3e6cc; font-family: "Cinzel", serif;
     font-size: 20px; letter-spacing: 4px; padding: 8px 18px; cursor: pointer;
     text-shadow: 0 0 10px rgba(255,210,150,.7); animation: glow 1.6s ease-in-out infinite;
   }
@@ -45,8 +48,7 @@
   #go:active { color: #fff; transform: scale(.97); }
   @keyframes glow { 50% { text-shadow: 0 0 18px rgba(255,210,150,1); } }
   @keyframes blink { 50% { opacity: 0; } }
-  #start .foot { position: absolute; bottom: calc(11vh + 14px); left: 0; right: 0; z-index: 3;
-    font-size: 10px; letter-spacing: 2px; color: #7d6d58; font-family: Georgia, serif; }
+  #start .foot { margin-top: 14px; font-size: 10px; letter-spacing: 2px; color: #7d6d58; font-family: Georgia, serif; }
 
   /* ---------- subtitle-style hint ---------- */
   #hint {
@@ -63,6 +65,7 @@
     background: linear-gradient(180deg, rgba(30,6,6,.94), rgba(8,2,2,.96)); color: #e8dcc8;
     border: 1px solid #8a6d45; outline: 1px solid rgba(138,109,69,.35); outline-offset: 3px;
     padding: 18px 20px 14px; transform: translateY(140%); transition: transform .35s ease;
+    max-height: 60vh; overflow-y: auto; box-sizing: border-box;
   }
   #card.open { transform: translateY(0); }
   #card .kicker { color: #c8141e; font-size: 11px; letter-spacing: 3px; }
@@ -79,9 +82,62 @@
    so x runs -0.5..0.5 and y runs -0.693..0.693 (centre = 0,0). */
 const IMG_W = 980, IMG_H = 1358;
 function px(x, y) { return { x: x / IMG_W - 0.5, y: (IMG_H / 2 - y) / IMG_W }; }
-
-/* Seeded random so the cracks look the same every time */
 function rng(seed) { return () => (seed = (seed * 16807) % 2147483647) / 2147483647; }
+function tex(canvas) { const t = new THREE.CanvasTexture(canvas); if ('colorSpace' in t) t.colorSpace = THREE.SRGBColorSpace; return t; }
+function flatMat(map) { return new THREE.MeshBasicMaterial({ map, transparent: true, depthTest: false }); }
+
+/* ---------- Gritty blood textures (drawn once in code) ---------- */
+const Blood = {
+  stem(seed) {                                   // ragged vertical streak
+    const r = rng(seed), c = document.createElement('canvas'); c.width = 64; c.height = 512;
+    const x = c.getContext('2d');
+    let wob = 0;
+    for (let y = 0; y < 512; y++) {
+      wob += (r() - 0.5) * 1.6; wob *= 0.92;
+      const pool = y < 50 ? (50 - y) * 0.25 : 0;            // wider where it seeps from the letter
+      const hw = 15 + wob + pool + (r() - 0.5) * 2.5;
+      const g = x.createLinearGradient(32 - hw, 0, 32 + hw, 0);
+      g.addColorStop(0, '#2a0003'); g.addColorStop(0.3, '#7a0710'); g.addColorStop(0.42, '#b3202a');
+      g.addColorStop(0.5, '#8a0a12'); g.addColorStop(1, '#260002');
+      x.fillStyle = g; x.fillRect(32 - hw, y, hw * 2, 1);
+    }
+    for (let i = 0; i < 160; i++) {               // clots and grime
+      x.fillStyle = `rgba(${20 + r() * 40},0,${r() * 6},${0.3 + r() * 0.5})`;
+      x.fillRect(16 + r() * 32, r() * 512, 1 + r() * 3, 2 + r() * 10);
+    }
+    return tex(c);
+  },
+  drop(seed) {                                   // teardrop bulb with a wet highlight
+    const r = rng(seed), c = document.createElement('canvas'); c.width = 64; c.height = 96;
+    const x = c.getContext('2d');
+    x.beginPath(); x.moveTo(32, 0);
+    x.bezierCurveTo(36, 22, 58 + r() * 4, 40, 58, 64); x.arc(32, 64, 26, 0, Math.PI, false);
+    x.bezierCurveTo(6 - r() * 4, 40, 28, 22, 32, 0); x.closePath();
+    const g = x.createRadialGradient(24, 58, 2, 32, 64, 34);
+    g.addColorStop(0, '#c2343c'); g.addColorStop(0.35, '#8c0b13'); g.addColorStop(1, '#2a0003');
+    x.fillStyle = g; x.fill();
+    x.fillStyle = 'rgba(255,220,220,.55)'; x.beginPath(); x.ellipse(22, 56, 4, 7, -0.4, 0, Math.PI * 2); x.fill();
+    return tex(c);
+  },
+  splat(seed) {                                  // irregular splatter with satellite droplets
+    const r = rng(seed), c = document.createElement('canvas'); c.width = c.height = 256;
+    const x = c.getContext('2d'); x.translate(128, 128);
+    const col = () => `rgba(${90 + r() * 70},${r() * 10},${r() * 14},${0.75 + r() * 0.25})`;
+    x.fillStyle = col(); x.beginPath();
+    const n = 14, pts = [];
+    for (let i = 0; i < n; i++) { const a = (i / n) * Math.PI * 2, rad = 28 + r() * 20 + (r() < 0.25 ? r() * 26 : 0); pts.push([Math.cos(a) * rad, Math.sin(a) * rad]); }
+    const mid = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+    let m0 = mid(pts[n - 1], pts[0]); x.moveTo(m0[0], m0[1]);
+    for (let i = 0; i < n; i++) { const m = mid(pts[i], pts[(i + 1) % n]); x.quadraticCurveTo(pts[i][0], pts[i][1], m[0], m[1]); }
+    x.fill();
+    for (let i = 0; i < 40; i++) {
+      const a = r() * Math.PI * 2, d = 50 + r() * 70, s = 1 + r() * 6;
+      x.fillStyle = col(); x.beginPath(); x.arc(Math.cos(a) * d, Math.sin(a) * d, s, 0, Math.PI * 2); x.fill();
+      if (r() < 0.3) { x.save(); x.rotate(a); x.fillRect(40, -1.5, 30 + r() * 30, 3); x.restore(); }
+    }
+    return tex(c);
+  }
+};
 
 /* ---------- Effect 1: glass cracks burst from the title ---------- */
 AFRAME.registerComponent('crack-burst', {
@@ -91,21 +147,18 @@ AFRAME.registerComponent('crack-burst', {
     this.segs = [];
     const rays = 12;
     for (let i = 0; i < rays; i++) {
-      let ang = (i / rays) * Math.PI * 2 + (r() - 0.5) * 0.5;
-      let x = c.x, y = c.y;
+      let ang = (i / rays) * Math.PI * 2 + (r() - 0.5) * 0.5, x = c.x, y = c.y;
       const total = 0.12 + r() * 0.25, steps = 4;
       for (let k = 0; k < steps; k++) {
         const len = (total / steps) * (0.7 + r() * 0.6);
         ang += (r() - 0.5) * 0.7;
-        const thick = 0.0045 - k * 0.0009;
-        const geo = new THREE.PlaneGeometry(len, thick); geo.translate(len / 2, 0, 0);
+        const geo = new THREE.PlaneGeometry(len, 0.0045 - k * 0.0009); geo.translate(len / 2, 0, 0);
         const m = new THREE.Mesh(geo, mat); m.position.set(x, y, 0.004); m.rotation.z = ang; m.scale.x = 0.0001;
         m.renderOrder = 5; group.add(m);
         this.segs.push({ m, delay: i * 0.03 + k * 0.11 });
         x += Math.cos(ang) * len; y += Math.sin(ang) * len;
       }
     }
-    // impact flash
     this.flash = new THREE.Mesh(new THREE.CircleGeometry(0.06, 32),
       new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthTest: false }));
     this.flash.position.set(c.x, c.y, 0.005); this.flash.renderOrder = 6; group.add(this.flash);
@@ -121,33 +174,73 @@ AFRAME.registerComponent('crack-burst', {
   }
 });
 
-/* ---------- Effect 2: the red title bleeds ---------- */
+/* ---------- Effect 2: the title bleeds (gritty, stop-start drips + splatter) ---------- */
 AFRAME.registerComponent('title-bleed', {
   init() {
     const r = rng(42), group = new THREE.Group();
-    const mat = new THREE.MeshBasicMaterial({ color: 0xa50f17, transparent: true, opacity: 0.95, depthTest: false });
+    const stems = [Blood.stem(1), Blood.stem(2), Blood.stem(3)];
+    const drops = [Blood.drop(4), Blood.drop(5)];
+    this.dropTex = drops;
     // drip start points along the bottom of the painted "Satya" strokes (image px)
-    const starts = [[40,455],[95,440],[150,445],[205,418],[262,415],[318,585],[372,425],[430,415],[490,405],[528,400]];
+    const starts = [[40,455],[70,450],[95,440],[130,448],[150,445],[205,418],[230,422],[262,415],
+                    [290,420],[318,585],[372,425],[400,428],[430,415],[460,412],[490,405],[528,400]];
     this.drips = starts.map(([sx, sy], i) => {
-      const p = px(sx, sy), w = 0.006 + r() * 0.007;
+      const p = px(sx, sy), thin = r() < 0.35, w = thin ? 0.003 + r() * 0.003 : 0.007 + r() * 0.009;
       const geo = new THREE.PlaneGeometry(w, 1); geo.translate(0, -0.5, 0);
-      const stem = new THREE.Mesh(geo, mat); stem.position.set(p.x, p.y, 0.003); stem.scale.y = 0.0001;
-      const bulb = new THREE.Mesh(new THREE.CircleGeometry(w * 0.9, 16), mat); bulb.position.set(p.x, p.y, 0.003);
+      const stem = new THREE.Mesh(geo, flatMat(stems[i % 3])); stem.position.set(p.x, p.y + 0.006, 0.003); stem.scale.y = 0.0001;
+      const bw = w * 2.1, bh = bw * 1.5;
+      const bulb = new THREE.Mesh(new THREE.PlaneGeometry(bw, bh), flatMat(drops[i % 2]));
+      bulb.position.set(p.x, p.y, 0.0031); bulb.visible = false;
       stem.renderOrder = bulb.renderOrder = 4;
       group.add(stem, bulb);
-      return { stem, bulb, y0: p.y, max: 0.04 + r() * 0.12, delay: 0.6 + i * 0.12 + r() * 0.4, dur: 2 + r() * 1.5 };
+      return { stem, bulb, bh, x: p.x, y0: p.y + 0.006, w, len: 0, max: thin ? 0.02 + r() * 0.06 : 0.05 + r() * 0.13,
+               v: 0.03 + r() * 0.05, pause: 0, delay: 0.5 + i * 0.09 + r() * 0.5, fell: false, r };
     });
+    // splatter that bursts out with the glass crack
+    this.splats = [[150, 300, 0.10], [470, 250, 0.08], [230, 480, 0.12], [400, 540, 0.07], [60, 360, 0.06]].map(([sx, sy, s], i) => {
+      const p = px(sx, sy);
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(s, s), flatMat(Blood.splat(10 + i)));
+      m.position.set(p.x, p.y, 0.0025); m.rotation.z = r() * Math.PI * 2; m.scale.set(0.001, 0.001, 1);
+      m.renderOrder = 3; group.add(m);
+      return { m, delay: 0.05 + r() * 0.25 };
+    });
+    this.falling = [];
+    this.group = group;
     this.el.setObject3D('mesh', group);
     this.t = -1;
   },
   start() { this.t = 0; },
-  tick(t, dt) {
-    if (this.t < 0 || this.t > 8) return;
-    this.t += dt / 1000;
+  tick(t, dtMs) {
+    if (this.t < 0) return;
+    const dt = Math.min(dtMs / 1000, 0.05);
+    this.t += dt;
+    for (const s of this.splats) {
+      const k = Math.max(0, Math.min(1, (this.t - s.delay) / 0.09));
+      const e = 1 - Math.pow(1 - k, 3) || 0.001; s.m.scale.set(e, e, 1);
+    }
     for (const d of this.drips) {
-      const p = Math.max(0, Math.min(1, (this.t - d.delay) / d.dur));
-      const len = d.max * (1 - Math.pow(1 - p, 3)) + 0.0001;
-      d.stem.scale.y = len; d.bulb.position.y = d.y0 - len;
+      if (this.t < d.delay) continue;
+      if (d.len < d.max) {
+        if (d.pause > 0) d.pause -= dt;
+        else {
+          d.len = Math.min(d.max, d.len + d.v * dt);
+          d.v = Math.max(d.v * 0.996, 0.004);
+          if (d.r() < 0.9 * dt) d.pause = 0.15 + d.r() * 0.6;   // blood stalls, then creeps on
+        }
+      } else if (!d.fell && d.w > 0.008 && d.r() < 0.4 * dt) {
+        d.fell = true;                                            // a heavy drop breaks off and falls
+        const m = new THREE.Mesh(new THREE.PlaneGeometry(d.w * 1.6, d.w * 2.4), flatMat(this.dropTex[0]));
+        m.position.set(d.x, d.y0 - d.len - d.bh * 0.4, 0.0032); m.renderOrder = 4; this.group.add(m);
+        this.falling.push({ m, vy: 0, dist: 0, max: 0.12 + d.r() * 0.2 });
+      }
+      d.stem.scale.y = d.len + 0.0001;
+      d.bulb.visible = d.len > 0.004;
+      d.bulb.position.y = d.y0 - d.len - d.bh * 0.5 + d.bh * 0.35;
+    }
+    for (const f of this.falling) {
+      if (f.dist > f.max + 0.2) continue;
+      f.vy += 0.9 * dt; f.m.position.y -= f.vy * dt; f.dist += f.vy * dt;
+      f.m.material.opacity = Math.max(0, 1 - Math.max(0, f.dist - f.max) / 0.15);
     }
   }
 });
@@ -178,26 +271,86 @@ AFRAME.registerComponent('skyline-lights', {
   }
 });
 
-/* ---------- Tappable info points ---------- */
+/* ---------- Hotspot icons (SVG drawn onto a badge) ---------- */
+const BONE = '#efe3c8', GOLD = '#d9b25c', INK = '#1a0505', RED = '#c8141e', LEAF = '#5f8a3a';
+const ICONS = {
+  gun: `<g fill="${BONE}"><rect x="10" y="36" width="46" height="9" rx="1"/><rect x="11" y="32" width="3" height="5"/>
+        <rect x="48" y="31" width="26" height="20" rx="3"/><path d="M70 31 L77 22 L82 25 L76 33 Z"/>
+        <path d="M64 49 L80 49 L89 77 Q90 82 85 82 L75 82 Q71 82 70 78 Z"/><rect x="60" y="51" width="3" height="7"/></g>
+        <rect x="52" y="36" width="18" height="2.5" fill="${INK}"/><rect x="52" y="42" width="18" height="2.5" fill="${INK}"/>
+        <path d="M55 51 Q54 63 66 61" fill="none" stroke="${BONE}" stroke-width="3"/>`,
+  rose: `<path d="M50 50 Q47 68 51 88" stroke="${LEAF}" stroke-width="4" fill="none"/>
+        <path d="M50 72 Q36 62 28 70 Q40 80 50 74Z" fill="${LEAF}"/><path d="M51 64 Q64 54 72 60 Q62 72 51 66Z" fill="${LEAF}"/>
+        <path d="M30 34 Q30 14 50 12 Q70 14 70 34 Q68 54 50 56 Q32 54 30 34Z" fill="${RED}"/>
+        <path d="M30 34 Q42 42 50 56 M70 34 Q58 42 50 56" stroke="#7a0a10" stroke-width="2" fill="none"/>
+        <path d="M39 30 Q50 18 61 30 Q59 43 50 45 Q41 43 39 30Z" fill="#8a0c13"/>
+        <path d="M45 30 Q50 24 56 31 Q53 38 48 36" fill="none" stroke="${BONE}" stroke-width="2"/>`,
+  camera: `<g fill="${BONE}"><circle cx="32" cy="32" r="12"/><circle cx="58" cy="30" r="14"/>
+        <rect x="18" y="46" width="48" height="28" rx="4"/><path d="M66 54 L86 44 L86 76 L66 66 Z"/></g>
+        <path d="M30 74 L24 90 M54 74 L60 90 M42 74 L42 90" stroke="${BONE}" stroke-width="3"/>
+        <circle cx="32" cy="32" r="4" fill="${INK}"/><circle cx="58" cy="30" r="5" fill="${INK}"/>`,
+  crown: `<g fill="${GOLD}"><path d="M16 72 L14 34 L33 52 L50 24 L67 52 L86 34 L84 72 Z"/><rect x="16" y="75" width="68" height="8" rx="2"/>
+        <circle cx="14" cy="32" r="4"/><circle cx="50" cy="22" r="4"/><circle cx="86" cy="32" r="4"/></g>
+        <circle cx="50" cy="60" r="5" fill="${RED}"/>`,
+  clapper: `<rect x="16" y="46" width="68" height="38" rx="3" fill="${BONE}"/><path d="M16 42 L80 26 L83 37 L19 53Z" fill="${BONE}"/>
+        <path d="M30 38.5 L38 36.5 L41 47.5 L33 49.5Z M46 34.5 L54 32.5 L57 43.5 L49 45.5Z M62 30.5 L70 28.5 L73 39.5 L65 41.5Z" fill="${INK}"/>
+        <rect x="16" y="58" width="68" height="3" fill="${INK}"/>`,
+  reel: `<circle cx="50" cy="50" r="34" fill="${BONE}"/>
+        <g fill="${INK}"><circle cx="50" cy="32" r="9"/><circle cx="67.1" cy="44.4" r="9"/><circle cx="60.6" cy="64.6" r="9"/>
+        <circle cx="39.4" cy="64.6" r="9"/><circle cx="32.9" cy="44.4" r="9"/><circle cx="50" cy="50" r="4"/></g>`,
+  music: `<g stroke="${BONE}" stroke-width="6" fill="none"><path d="M40 24 L80 16"/><path d="M40 34 L80 26"/>
+        <path d="M40 22 L40 74"/><path d="M80 14 L80 66"/></g>
+        <ellipse cx="31" cy="74" rx="11" ry="8" fill="${BONE}"/><ellipse cx="71" cy="66" rx="11" ry="8" fill="${BONE}"/>`,
+  trophy: `<g fill="${GOLD}"><path d="M30 18 L70 18 L68 44 Q66 60 50 62 Q34 60 32 44 Z"/>
+        <rect x="45" y="62" width="10" height="12"/><rect x="32" y="74" width="36" height="9" rx="2"/></g>
+        <path d="M30 24 Q14 24 18 38 Q22 48 33 48 M70 24 Q86 24 82 38 Q78 48 67 48" stroke="${GOLD}" stroke-width="5" fill="none"/>`
+};
+
+AFRAME.registerComponent('badge-icon', {
+  schema: { icon: { type: 'string' } },
+  init() {
+    const S = 256, c = document.createElement('canvas'); c.width = c.height = S;
+    const x = c.getContext('2d');
+    const base = () => {
+      x.clearRect(0, 0, S, S);
+      x.fillStyle = 'rgba(18,4,4,0.92)'; x.beginPath(); x.arc(S / 2, S / 2, 118, 0, Math.PI * 2); x.fill();
+      x.strokeStyle = '#b08a55'; x.lineWidth = 7; x.stroke();
+    };
+    base();
+    const t = tex(c);
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(0.08, 0.08), flatMat(t));
+    mesh.renderOrder = 8; this.el.setObject3D('mesh', mesh);
+    const img = new Image();
+    img.onload = () => { base(); x.drawImage(img, 48, 48, 160, 160); t.needsUpdate = true; };
+    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100">${ICONS[this.data.icon]}</svg>`);
+  }
+});
+
+/* ---------- Chapters (info cards) ---------- */
 const INFO = {
-  title: { kicker: 'The film', title: 'Satya (1998)',
-    body: 'Satya ("Truth") is a 1998 Hindi crime film produced and directed by Ram Gopal Varma, written by Saurabh Shukla and Anurag Kashyap. It released on 3 July 1998.' },
-  tagline: { kicker: 'The city', title: 'The Other Side of Truth',
-    body: 'The tagline sits on shattered glass above the Mumbai skyline. The city is the film\'s real backdrop: Satya was shot in Mumbai on a budget of about ₹2.5 crore.' },
+  synopsis: { kicker: 'Synopsis', title: 'Satya (1998)',
+    body: 'Satya, a young man with no past, arrives in Bombay looking for work. After a clash with a local thug lands him in jail, he meets the volatile gangster Bhiku Mhatre and is drawn into his gang. As Satya rises through the underworld, he falls for his neighbour Vidya, who knows nothing of his other life, until gang war, the police and politics close in on them all. Written by Saurabh Shukla and Anurag Kashyap; released 3 July 1998.' },
+  rgv: { kicker: 'The director', title: 'Ram Gopal Varma',
+    body: 'The Telugu filmmaker who broke through with Shiva (1989) produced and directed Satya, shooting it on real Mumbai streets on a budget of about ₹2.5 crore. The film opens with his note: "My tears for Satya are as much as they are for the people whom he killed."' },
   satya: { kicker: 'Character', title: 'Satya — J. D. Chakravarthy',
-    body: 'An outsider with no past who arrives in Bombay looking for work and is pulled into the underworld, rising inside a gang while hiding that life from the woman he loves.' },
+    body: 'An outsider with no past and few words. Quiet, calculating and loyal, he becomes the gang\'s sharpest mind while hiding that life from the woman he loves.' },
   vidya: { kicker: 'Character', title: 'Vidya — Urmila Matondkar',
     body: 'Satya\'s neighbour and an aspiring singer. Their quiet romance and its songs play against the violence of the gang world. Matondkar was nominated for the Filmfare Best Actress award.' },
+  bhiku: { kicker: 'Character', title: 'Bhiku Mhatre — Manoj Bajpayee',
+    body: 'Loud, hot-headed and fiercely loyal, the gang leader who befriends Satya in jail. His cry "Mumbai ka King kaun? Bhiku Mhatre!" became one of Hindi cinema\'s most quoted lines, and the role won Bajpayee the National Film Award for Best Supporting Actor.' },
   chase: { kicker: 'Behind the camera', title: 'Guerrilla filmmaking',
     body: 'Shot by Gerard Hooper and Mazhar Kamran (printed "Hamran" on this poster). Kamran used available light and a small crew so they could film on real Mumbai streets without being mobbed.' },
   credits: { kicker: 'Sound', title: 'Music',
     body: 'Songs composed by Vishal Bhardwaj with lyrics by Gulzar. The background score is by Sandeep Chowta.' },
   legacy: { kicker: 'Legacy', title: 'Redefining Indian noir',
-    body: 'Satya won six Filmfare Awards and a National Film Award (Manoj Bajpayee, Best Supporting Actor), launched the careers of Bajpayee and Anurag Kashyap, and began Varma\'s Gangster trilogy with Company and D.' }
+    body: 'Satya won six Filmfare Awards and a National Film Award, launched the careers of Manoj Bajpayee and Anurag Kashyap, and began Varma\'s Gangster trilogy with Company and D.' }
 };
+// [id, icon, x, y] in poster pixels; order = chapter number
 const SPOTS = [
-  ['legacy', 75, 45], ['title', 290, 330], ['tagline', 45, 525], ['satya', 880, 250],
-  ['chase', 180, 720], ['vidya', 560, 790], ['credits', 70, 1280]
+  ['synopsis', 'clapper', 290, 330], ['rgv', 'camera', 330, 175], ['satya', 'gun', 880, 250],
+  ['vidya', 'rose', 560, 790], ['bhiku', 'crown', 520, 555], ['chase', 'reel', 180, 720],
+  ['credits', 'music', 70, 1280], ['legacy', 'trophy', 75, 45]
 ];
 
 AFRAME.registerComponent('hotspot', {
@@ -215,7 +368,7 @@ AFRAME.registerComponent('hotspot', {
 const sfx = {
   ctx: null, master: null, theme: null,
   init() {
-    // Optional: drop your own track at assets/theme.mp3 and it replaces the drone.
+    // Optional: put your own track at assets/theme.mp3 and it replaces the drone.
     this.theme = new Audio('assets/theme.mp3'); this.theme.loop = true; this.theme.volume = 0;
     this.theme.addEventListener('error', () => { this.theme = null; });
     const ctx = this.ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -263,6 +416,7 @@ function openCard(id) {
   card.querySelector('.kicker').textContent = `CHAPTER ${String(n).padStart(2, '0')} · ${i.kicker.toUpperCase()}`;
   card.querySelector('h2').textContent = i.title;
   card.querySelector('p').textContent = i.body;
+  card.scrollTop = 0;
   card.classList.add('open');
 }
 function hint(text, ms) {
@@ -275,15 +429,16 @@ function hint(text, ms) {
 <body>
 <div id="start">
   <canvas id="grain"></canvas>
+  <img class="quote" src="assets/quote.jpg" alt="">
   <div class="vig"></div>
-  <div class="content">
+  <div class="top">
     <div class="pre">RAM GOPAL VARMA'S</div>
     <h1>Satya</h1>
-    <div class="tag">THE OTHER SIDE OF TRUTH</div>
-    <div class="hi">सत्या</div>
-    <button id="go"><span class="arrow">▶</span>PLAY MOVIE</button>
   </div>
-  <div class="foot">POINT YOUR CAMERA AT THE POSTER · SOUND ON</div>
+  <div class="bottom">
+    <button id="go"><span class="arrow">▶</span>PLAY MOVIE</button>
+    <div class="foot">POINT YOUR CAMERA AT THE POSTER · SOUND ON</div>
+  </div>
 </div>
 <div id="hint"></div>
 <div id="card"><div class="kicker"></div><h2></h2><p></p><button id="close"><span class="arrow">◀</span>RESUME</button></div>
@@ -305,6 +460,9 @@ function hint(text, ms) {
 
 <script>
 const scene = document.querySelector('a-scene');
+const target = document.getElementById('target');
+const spots = document.getElementById('spots');
+let played = false;
 
 // Film grain on the menu
 (() => {
@@ -317,20 +475,17 @@ const scene = document.querySelector('a-scene');
     x.putImageData(img, 0, 0); setTimeout(() => requestAnimationFrame(loop), 50);
   })();
 })();
-const target = document.getElementById('target');
-const spots = document.getElementById('spots');
-let played = false;
 
 // Build the hotspots
-SPOTS.forEach(([id, x, y]) => {
+SPOTS.forEach(([id, icon, x, y]) => {
   const p = px(x, y);
   const e = document.createElement('a-entity');
   e.setAttribute('position', `${p.x} ${p.y} 0.01`);
   e.setAttribute('visible', 'false');
   e.innerHTML = `
-    <a-ring radius-inner="0.022" radius-outer="0.03" color="#ffffff" material="shader: flat; transparent: true; opacity: 0.9"
-      animation="property: scale; from: 1 1 1; to: 1.5 1.5 1.5; dir: alternate; loop: true; dur: 800; easing: easeInOutSine"></a-ring>
-    <a-circle radius="0.016" color="#e0242c" material="shader: flat"></a-circle>
+    <a-ring radius-inner="0.042" radius-outer="0.047" color="#c8141e" material="shader: flat; transparent: true; opacity: 0.85"
+      animation="property: scale; from: 1 1 1; to: 1.3 1.3 1.3; dir: alternate; loop: true; dur: 900; easing: easeInOutSine"></a-ring>
+    <a-entity badge-icon="icon: ${icon}"></a-entity>
     <a-circle class="clickable" hotspot="id: ${id}" radius="0.055" material="shader: flat; transparent: true; opacity: 0"></a-circle>`;
   spots.appendChild(e);
 });
@@ -353,7 +508,7 @@ target.addEventListener('targetFound', () => {
     document.getElementById('bleed').components['title-bleed'].start();
     document.getElementById('lights').components['skyline-lights'].start();
     setTimeout(showSpots, 2200);
-    setTimeout(() => hint('Tap the red points to explore', 4000), 3200);
+    setTimeout(() => hint('Tap the icons to explore', 4000), 3600);
   }
 });
 target.addEventListener('targetLost', () => {
@@ -372,7 +527,7 @@ document.getElementById('go').addEventListener('click', () => {
   o.connect(g); g.connect(sfx.ctx.destination); o.start(t); o.stop(t + 0.2);
   const st = document.getElementById('start'); st.classList.add('out');
   setTimeout(() => st.style.display = 'none', 650);
-  const run = () => { scene.systems['mindar-image-system'].start(); };
+  const run = () => scene.systems['mindar-image-system'].start();
   scene.hasLoaded ? run() : scene.addEventListener('loaded', run);
 });
 document.getElementById('close').addEventListener('click', () => document.getElementById('card').classList.remove('open'));
