@@ -355,7 +355,34 @@ const SPOTS = [
   ['credits', 'music', 70, 1280], ['legacy', 'trophy', 75, 45]
 ];
 
-// Movie clips for each chapter (assets/videos/<name>.mp4). Chapters without one just show the card.
+/* ---------- Vintage TV screen: bezel + live video texture, drawn above all effects ---------- */
+AFRAME.registerComponent('scene-screen', {
+  init() {
+    const g = new THREE.Group();
+    const plane = (w, h, color, z, order) => {
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h),
+        new THREE.MeshBasicMaterial({ color, depthTest: false, transparent: true }));
+      m.position.z = z; m.renderOrder = order; g.add(m); return m;
+    };
+    plane(0.98, 0.56, 0x0b0505, 0, 20);
+    plane(0.952, 0.532, 0x8a6d45, 0.001, 21);
+    plane(0.94, 0.52, 0x000000, 0.002, 22);
+    const video = document.getElementById('scene-vid');
+    const vt = new THREE.VideoTexture(video);
+    if ('colorSpace' in vt) vt.colorSpace = THREE.SRGBColorSpace;
+    vt.minFilter = THREE.LinearFilter; vt.magFilter = THREE.LinearFilter; vt.generateMipmaps = false;
+    this.screen = new THREE.Mesh(new THREE.PlaneGeometry(0.92, 0.485),
+      new THREE.MeshBasicMaterial({ map: vt, depthTest: false, transparent: true }));
+    this.screen.position.z = 0.003; this.screen.renderOrder = 23; g.add(this.screen);
+    this.vt = vt; this.video = video;
+    this.el.setObject3D('mesh', g);
+  },
+  tick() {   // keep the frame fresh even where requestVideoFrameCallback is missing
+    if (this.video.readyState >= 2 && !this.video.paused) this.vt.needsUpdate = true;
+  }
+});
+
+// Movie clips for each chapter (assets/<name>.mp4). Chapters without one just show the card.
 const CLIPS = { synopsis: 'synopsis', rgv: 'rgv', satya: 'satya', vidya: 'vidya', bhiku: 'bhiku', credits: 'music' };
 
 const scenePlayer = {
@@ -363,7 +390,7 @@ const scenePlayer = {
   play(id) {
     const v = document.getElementById('scene-vid'), screen = document.getElementById('screen');
     if (!CLIPS[id]) { this.stop(); return; }
-    if (this.playing !== id) { v.src = `assets/videos/${CLIPS[id]}.mp4`; v.load(); }
+    if (this.playing !== id) { v.src = `assets/${CLIPS[id]}.mp4`; v.load(); }
     this.playing = id;
     v.currentTime = 0;
     v.play().catch(() => {});
@@ -470,7 +497,8 @@ function hint(text, ms) {
   </div>
 </div>
 <div id="hint"></div>
-<video id="scene-vid" playsinline webkit-playsinline preload="none" style="display:none"></video>
+<video id="scene-vid" playsinline webkit-playsinline preload="auto"
+  style="position:fixed;left:0;top:0;width:2px;height:2px;opacity:0.01;pointer-events:none;z-index:-1"></video>
 <div id="card"><div class="kicker"></div><h2></h2><p></p><div class="credit"></div><button id="close"><span class="arrow">◀</span>RESUME</button></div>
 
 <a-scene
@@ -486,12 +514,7 @@ function hint(text, ms) {
     <a-entity id="lights" skyline-lights></a-entity>
     <a-entity id="spots"></a-entity>
     <!-- vintage TV screen that pops out in front of the poster -->
-    <a-entity id="screen" position="0 0.12 0.12" visible="false">
-      <a-plane width="0.98" height="0.56" color="#0b0505" material="shader: flat"></a-plane>
-      <a-plane width="0.952" height="0.532" position="0 0 0.001" color="#8a6d45" material="shader: flat"></a-plane>
-      <a-plane width="0.94" height="0.52" position="0 0 0.002" color="#000" material="shader: flat"></a-plane>
-      <a-plane width="0.92" height="0.485" position="0 0 0.003" material="shader: flat; src: #scene-vid"></a-plane>
-    </a-entity>
+    <a-entity id="screen" position="0 0.12 0.12" visible="false" scene-screen></a-entity>
   </a-entity>
 </a-scene>
 
